@@ -1040,36 +1040,52 @@ function move(e) {
                 if(initialPinchDistance > 0) {
                     const pinchDelta = currentPinchDistance / initialPinchDistance;
                     
-                    if(Math.abs(pinchDelta - 1) > 0.05) {
+                    // Direct response to finger movement
+                    if(Math.abs(pinchDelta - 1) > 0.01) {
+                        // Direct scale change based on finger distance
                         let newScale = scale * pinchDelta;
                         
-                        // Only snap when zooming out
-                        if(newScale < 1.1 && pinchDelta < 1) {
-                            newScale = 1;
+                        // Enforce scale limits
+                        newScale = Math.max(1, Math.min(5, newScale));
+                        
+                        if(newScale === 1) {
                             x = 0;
                             y = 0;
-                        }
-
-                        if(newScale >= 1 && newScale <= 50) {
+                        } else if(newScale >= 1 && newScale <= 5) {
                             disable_autoresizer();
                             
-                            if(newScale > 1) {
-                                x *= pinchDelta;
-                                y *= pinchDelta;
-                                
-                                // Apply bounds with slight elasticity for smoother feel
-                                const maxOffset = Math.max(0, (media_w * newScale - viewport_w) / 2);
-                                const maxOffsetY = Math.max(0, (media_h * newScale - viewport_h) / 2);
-                                x = Math.min(Math.max(x, -maxOffset * 1.05), maxOffset * 1.05);
-                                y = Math.min(Math.max(y, -maxOffsetY * 1.05), maxOffsetY * 1.05);
-                            }
+                            const rect = panel.getBoundingClientRect();
                             
-                            scale = newScale;
-                            setStyle(panel, "transition", "transform 0.3s ease-out");
-                            setStyle(media, "transition", "transform 0.3s ease-out");
-                            update_panel(x, y);
-                            setStyle(media, "transform", `translate(-50%, -50%) scale(${scale})`);
+                            // Calculate the center of the pinch in viewport space
+                            const pinchCenterX = (touches[0].pageX + touches[1].pageX) / 2 - rect.left;
+                            const pinchCenterY = (touches[0].pageY + touches[1].pageY) / 2 - rect.top;
+                            
+                            // Convert to image space coordinates
+                            const imageX = (pinchCenterX - viewport_w/2 - x) / scale;
+                            const imageY = (pinchCenterY - viewport_h/2 - y) / scale;
+                            
+                            // Calculate new position to keep pinch center fixed
+                            x = pinchCenterX - viewport_w/2 - (imageX * newScale);
+                            y = pinchCenterY - viewport_h/2 - (imageY * newScale);
+                            
+                            // Calculate bounds
+                            const maxOffset = Math.max(0, (media_w * newScale - viewport_w) / 2);
+                            const maxOffsetY = Math.max(0, (media_h * newScale - viewport_h) / 2);
+                            
+                            // Strict bounds with no elasticity when zooming
+                            x = Math.max(-maxOffset, Math.min(maxOffset, x));
+                            y = Math.max(-maxOffsetY, Math.min(maxOffsetY, y));
                         }
+                        
+                        scale = newScale;
+                        
+                        // Remove transitions for direct manipulation
+                        setStyle(panel, "transition", "transform 0.3s ease-out");
+                        setStyle(media, "transition", "transform 0.3s ease-out");
+                        update_panel(x, y);
+                        setStyle(media, "transform", `translate(-50%, -50%) scale(${scale})`);
+                        
+                        // Update reference distance for continuous zooming
                         initialPinchDistance = currentPinchDistance;
                     }
                 }
