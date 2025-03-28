@@ -27,13 +27,14 @@ button{
     padding: 5px 10px;
 }
 
-.spotlight img,
-.image{
+.spotlight img, .image {
     width: 29vw;
     height: auto;
     max-width: 300px;
     margin: 1vmin 1vmin;
-    content-visibility: auto;
+}
+.long .spotlight img {
+    width: auto;
 }
 .image{
     display: inline-block;
