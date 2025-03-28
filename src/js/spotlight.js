@@ -7,28 +7,26 @@
  */
 
 import {
-
     addClass,
-    removeClass,
-    toggleClass,
-    setStyle,
-    prepareStyle,
-    getByClass,
-    setText,
     addListener,
-    toggleListener,
     cancelEvent,
     createElement,
-    toggleDisplay,
+    downloadImage,
+    getByClass,
+    prepareStyle,
+    removeClass,
+    setStyle,
+    setText,
     toggleAnimation,
-    toggleVisibility,
-    downloadImage
-
+    toggleClass,
+    toggleDisplay,
+    toggleListener,
+    toggleVisibility
 } from "./helper.js";
 
 import { controls, controls_default, keycodes } from "./config.js";
-import widget from "./template.js";
 import parse_src from "./parser.js";
+import widget from "./template.js";
 
 const controls_dom = {};
 const connection = navigator["connection"];
@@ -43,6 +41,10 @@ let viewport_h;
 let media_w;
 let media_h;
 let scale;
+let initialPinchDistance = 0;
+let lastTapTime = 0;
+let lastTapX = 0;
+let lastTapY = 0;
 
 let is_down;
 let dragged;
@@ -934,9 +936,6 @@ export function menu(state){
 }
 
 function start(e){
-
-    //console.log("start");
-
     cancelEvent(e, true);
 
     is_down = true;
@@ -944,47 +943,77 @@ function start(e){
 
     let touches = e.touches;
 
-    if(touches && (touches = touches[0])){
-
-        e = touches;
+    if(touches){
+        if(touches.length === 2) {
+            // Store initial pinch distance
+            initialPinchDistance = Math.hypot(
+                touches[0].pageX - touches[1].pageX,
+                touches[0].pageY - touches[1].pageY
+            );
+            return;
+        }
+        touches = touches[0];
+        
+        // Handle double tap
+        const currentTime = Date.now();
+        const tapX = touches.pageX;
+        const tapY = touches.pageY;
+        
+        // Check if this is a double tap (within 300ms and 30px of last tap)
+        if(currentTime - lastTapTime < 300 && 
+           Math.abs(tapX - lastTapX) < 30 && 
+           Math.abs(tapY - lastTapY) < 30) {
+            
+            // If already zoomed in, zoom out to normal. Otherwise zoom in
+            if(scale > 1) {
+                autofit();
+            } else {
+                zoom_in();
+            }
+            
+            // Reset tap tracking
+            lastTapTime = 0;
+            is_down = false;
+            return;
+        }
+        
+        // Store this tap's info for next time
+        lastTapTime = currentTime;
+        lastTapX = tapX;
+        lastTapY = tapY;
     }
 
-    slidable = /* !toggle_autofit && */ (media_w * scale) <= viewport_w;
-    startX = e.pageX;
-    startY = e.pageY;
+    slidable = (media_w * scale) <= viewport_w;
+    startX = e.pageX || touches.pageX;
+    startY = e.pageY || touches.pageY;
 
     toggleAnimation(panel);
+
+    // Clear transitions when starting drag
+    setStyle(panel, "transition", "");
+    setStyle(media, "transition", "");
 }
 
 function end(e){
-
-    //console.log("end");
-
     cancelEvent(e);
 
     if(is_down){
+        initialPinchDistance = 0; // Reset pinch distance on touch end
 
         if(!dragged){
-
             menu();
         }
         else{
-
             if(slidable && dragged){
-
                 const has_next = (x < -(viewport_w / 7)) && ((current_slide < slide_count) || options_infinite);
                 const has_prev = has_next || (x > (viewport_w / 7)) && ((current_slide > 1) || options_infinite);
 
                 if(has_next || has_prev){
-
-                    update_slider(current_slide - 1, /* prepare? */ true, x / viewport_w * 100);
-
-                    (has_next && next()) ||
-                    (has_prev && prev());
+                    update_slider(current_slide - 1, true, x / viewport_w * 100);
+                    (has_next && next()) || (has_prev && prev());
                 }
 
                 x = 0;
-
                 update_panel();
             }
 
@@ -995,61 +1024,123 @@ function end(e){
     }
 }
 
-function move(e){
-
-    //console.log("move");
-
+function move(e) {
     cancelEvent(e);
 
-    if(is_down){
-
+    if(is_down) {
         let touches = e.touches;
 
-        if(touches && (touches = touches[0])){
-
-            e = touches;
+        if(touches) {
+            if(touches.length === 2 && options["zoom-in"] !== false) {
+                const currentPinchDistance = Math.hypot(
+                    touches[0].pageX - touches[1].pageX,
+                    touches[0].pageY - touches[1].pageY
+                );
+                
+                if(initialPinchDistance > 0) {
+                    const pinchDelta = currentPinchDistance / initialPinchDistance;
+                    
+                    // Direct response to finger movement
+                    if(Math.abs(pinchDelta - 1) > 0.01) {
+                        // Direct scale change based on finger distance
+                        let newScale = scale * pinchDelta;
+                        
+                        // Enforce scale limits
+                        newScale = Math.max(1, Math.min(5, newScale));
+                        
+                        if(newScale === 1) {
+                            x = 0;
+                            y = 0;
+                        } else if(newScale >= 1 && newScale <= 5) {
+                            disable_autoresizer();
+                            
+                            const rect = panel.getBoundingClientRect();
+                            
+                            // Calculate the center of the pinch in viewport space
+                            const pinchCenterX = (touches[0].pageX + touches[1].pageX) / 2 - rect.left;
+                            const pinchCenterY = (touches[0].pageY + touches[1].pageY) / 2 - rect.top;
+                            
+                            // Convert to image space coordinates
+                            const imageX = (pinchCenterX - viewport_w/2 - x) / scale;
+                            const imageY = (pinchCenterY - viewport_h/2 - y) / scale;
+                            
+                            // Calculate new position to keep pinch center fixed
+                            x = pinchCenterX - viewport_w/2 - (imageX * newScale);
+                            y = pinchCenterY - viewport_h/2 - (imageY * newScale);
+                            
+                            // Calculate bounds
+                            const maxOffset = Math.max(0, (media_w * newScale - viewport_w) / 2);
+                            const maxOffsetY = Math.max(0, (media_h * newScale - viewport_h) / 2);
+                            
+                            // Strict bounds with no elasticity when zooming
+                            x = Math.max(-maxOffset, Math.min(maxOffset, x));
+                            y = Math.max(-maxOffsetY, Math.min(maxOffsetY, y));
+                        }
+                        
+                        scale = newScale;
+                        
+                        // Remove transitions for direct manipulation
+                        setStyle(panel, "transition", "transform 0.3s ease-out");
+                        setStyle(media, "transition", "transform 0.3s ease-out");
+                        update_panel(x, y);
+                        setStyle(media, "transform", `translate(-50%, -50%) scale(${scale})`);
+                        
+                        // Update reference distance for continuous zooming
+                        initialPinchDistance = currentPinchDistance;
+                    }
+                }
+                return;
+            }
+            touches = touches[0];
         }
 
+        // Natural scroll speed based on zoom level
+        const speedMultiplier = Math.max(1, scale * 0.15);
+
         // handle x-axis in slide mode and in drag mode
-
         let diff = (media_w * scale - viewport_w) / 2;
-        x -= startX - (startX = e.pageX);
+        const deltaX = (startX - (touches ? touches.pageX : e.pageX)) * speedMultiplier;
+        const deltaY = (startY - (touches ? touches.pageY : e.pageY)) * speedMultiplier;
+        
+        startX = touches ? touches.pageX : e.pageX;
+        startY = touches ? touches.pageY : e.pageY;
 
-        if(!slidable){
+        if(!slidable) {
+            // Apply smooth movement with slight elasticity at bounds
+            const targetX = x - deltaX;
+            const targetY = y - deltaY;
 
-            if(x > diff){
-
-                x = diff;
+            // Add slight elasticity at bounds for smoother feel
+            const elasticity = 0.5;
+            
+            if(Math.abs(targetX) > diff) {
+                x = targetX > 0 ? 
+                    diff + (targetX - diff) * elasticity : 
+                    -diff + (targetX + diff) * elasticity;
+            } else {
+                x = targetX;
             }
-            else if(x < -diff){
 
-                x = -diff
-            }
-
-            // handle y-axis in drag mode
-
-            if((media_h * scale) > viewport_h){
-
+            if((media_h * scale) > viewport_h) {
                 diff = (media_h * scale - viewport_h) / 2;
-                y -= startY - (startY = e.pageY);
-
-                if(y > diff){
-
-                    y = diff;
-                }
-                else if(y < -diff){
-
-                    y = -diff;
+                
+                if(Math.abs(targetY) > diff) {
+                    y = targetY > 0 ? 
+                        diff + (targetY - diff) * elasticity : 
+                        -diff + (targetY + diff) * elasticity;
+                } else {
+                    y = targetY;
                 }
             }
+        } else {
+            x -= deltaX;
         }
 
         dragged = true;
-
+        setStyle(panel, "transition", "none"); // Remove transition during drag for immediate response
         update_panel(x, y);
     }
-    else{
-
+    else {
         autohide();
     }
 }
@@ -1137,79 +1228,58 @@ export function autofit(init){
  */
 
 function zoom_in(e){
+    let value = scale / 0.7;
 
-    //console.log("zoom_in");
-
-    let value = scale / 0.65;
-
-    if(value <= 50){
-
-        //console.log(toggle_autofit);
-
+    if(value <= 50) {
         disable_autoresizer();
 
-        // if(options_fit){
-        //
-        //     removeClass(media, options_fit);
-        // }
+        // Apply smooth transitions
+        setStyle(panel, "transition", "transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)");
+        setStyle(media, "transition", "transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)");
 
-        x /= 0.65;
-        y /= 0.65;
+        // Update scale
+        scale = value;
 
+        // Apply transforms
         update_panel(x, y);
-        zoom(value);
+        setStyle(media, "transform", `translate(-50%, -50%) scale(${scale})`);
     }
-
-    //e && autohide();
 }
 
 /**
  * @param {Event=} e
  */
-
 function zoom_out(e){
+    let value = scale * 0.85;
 
-    //console.log("zoom_out");
+    if(value >= 1) {
+        disable_autoresizer();
 
-    let value = scale * 0.65;
-
-    disable_autoresizer();
-
-    if(value >= 1){
-
-        if(value === 1){
-
-            x = y = 0;
-
-            // if(options_fit){
-            //
-            //     addClass(media, options_fit);
-            // }
-        }
-        else{
-
-            x *= 0.65;
-            y *= 0.65;
+        // Snap to scale 1 when getting close
+        if(scale < 1.5) {
+            value = 1;
+            x = 0;
+            y = 0;
         }
 
+        // Apply smooth transitions with longer duration for zoom out
+        setStyle(panel, "transition", "transform 0.4s cubic-bezier(0.4, 0.0, 0.2, 1)");
+        setStyle(media, "transition", "transform 0.4s cubic-bezier(0.4, 0.0, 0.2, 1)");
+
+        scale = value;
+
+        // Apply transforms
         update_panel(x, y);
-        zoom(value);
+        setStyle(media, "transform", `translate(-50%, -50%) scale(${scale})`);
     }
-
-    //e && autohide();
 }
 
 /**
  * @param {number=} factor
  */
-
 export function zoom(factor){
-
-    //console.log("zoom", factor);
-
     scale = factor || 1;
-
-    update_scroll();
+    setStyle(media, "transform", `translate(-50%, -50%) scale(${scale})`);
 }
 
 export function info(){

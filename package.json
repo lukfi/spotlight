@@ -36,9 +36,9 @@
   },
   "scripts": {
     "copy": "cpx \"src/img/*.*\" dist/img/",
-    "clean": "if exist dist rmdir dist /s /q && mkdir dist && if exist dist rmdir tmp /s /q && mkdir tmp",
+    "clean": "rm -rf dist tmp && mkdir dist tmp",
     "build:css": "lessc src/css/spotlight.less src/css/spotlight.css",
-    "build:css:bundle": "node task/bundle --image && lessc --autoprefix=\">=1%\" --csswring=\"--sourcemap --preserve-hacks\" --clean-css=\"--s1 --advanced --rebase\" tmp/bundle.less dist/css/spotlight.min.css && csso dist/css/spotlight.min.css --output dist/css/spotlight.min.css",
+    "build:css:bundle": "node task/bundle --image && lessc --autoprefix=\">=1%\" --clean-css=\"--s1 --advanced --rebase\" tmp/bundle.less dist/css/spotlight.min.css && csso dist/css/spotlight.min.css --output dist/css/spotlight.min.css",
     "build:js": "node task/build",
     "build:bundle": "node task/build --bundle",
     "build:svg": "node task/svgo",
