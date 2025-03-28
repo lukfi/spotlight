@@ -7,7 +7,7 @@ html, body{
     font-family: Aral, Helvetica, sans-serif;
     text-align: center;
     -webkit-tap-highlight-color: rgba(0,0,0,0);
-    background: #f8f9fa;
+    background: #000000;
 }
 main{
     position: relative;
@@ -46,7 +46,7 @@ button{
 .spotlight img{
     height: 20vw;
     max-height: 200px;
-    object-fit: cover;
+    object-fit: contain;
 }
 .spotlight{
     cursor: pointer;
