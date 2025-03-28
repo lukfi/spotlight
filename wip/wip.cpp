@@ -1,8 +1,8 @@
 #include "export/systeminfo.h"
 #include <stdio.h>
-#include <string>
 #include <cstdarg> // va_list, va_start(), va_end()
 #include <sstream>
+#include <cstring>
 
 void sformata(std::string& s, const std::string fmt, ...)
 {
@@ -138,7 +138,7 @@ DLL_EXPORT char* GenerateIndex(const char* images[], int count)
     char* ret = new char[indexString.size() + 1];
     if (ret)
     {
-        memcpy_s(ret, len, indexString.data(), indexString.size());
+        memcpy(ret, indexString.data(), indexString.size());
         ret[indexString.size()] = 0;
     }
 

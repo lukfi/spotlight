@@ -7,3 +7,10 @@ package-lock.json
 wip/wip/x64/*
 wip/x64/*
 wip/.vs/*
+
+wip/Makefile
+
+wip/.qmake.stash
+
+libwip.so.1*
+*.o
