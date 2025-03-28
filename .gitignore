@@ -3,3 +3,7 @@ log/
 tmp/
 
 package-lock.json
+
+wip/wip/x64/*
+wip/x64/*
+wip/.vs/*
