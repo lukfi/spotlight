@@ -1,0 +1,41 @@
+:root {
+  /* Backgrounds */
+  --bg0:   #070a10;
+  --bg1:   #0c111a;
+  --bg:    #0e1116;
+
+  /* Surfaces */
+  --panel:     #111827;
+  --panel-alt: #1b2230;
+  --panel2:    #0f172a;
+
+  /* Typography */
+  --text:  #e6e9ef;
+  --muted: #9aa4b2;
+
+  /* Accents */
+  --accent:      #6da9ff;
+  --accent2:     #8b5cf6;
+  --accent-soft: rgba(109, 169, 255, 0.15);
+
+  /* Borders */
+  --border: #1f2a3a;
+
+  /* Semantic */
+  --danger: #ff6b6b;
+  --ok:     #49d18a;
+
+  /* Design tokens */
+  --shadow: 0 18px 50px rgba(0, 0, 0, .55);
+  --radius: 18px;
+}
+
+[data-theme="black"] {
+  --bg0:       #000000;
+  --bg1:       #050505;
+  --bg:        #0a0a0a;
+  --panel:     #111111;
+  --panel-alt: #161616;
+  --panel2:    #0d0d0d;
+  --border:    #1e1e1e;
+}

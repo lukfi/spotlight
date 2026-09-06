@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Photo Galleries</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <script>(function(){var t=localStorage.getItem('theme');if(t==='black')document.documentElement.setAttribute('data-theme','black');})();</script>
+    <link rel="stylesheet" href="theme.css" />
+    <style>
+        
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: linear-gradient(180deg, #0c1016, #0e1116);
+            color: var(--text);
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial;
+        }
+
+        .app {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 24px;
+        }
+
+        header {
+            margin-bottom: 24px;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+            letter-spacing: 0.4px;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .version-badge {
+            display: inline-block;
+            margin-top: 6px;
+            font-family: "JetBrains Mono", Consolas, monospace;
+            font-size: 11px;
+            color: var(--muted);
+            background: var(--panel-alt);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 2px 7px;
+            letter-spacing: .3px;
+        }
+
+        .table-container {
+            background: var(--panel);
+            border-radius: 14px;
+            padding: 12px;
+            box-shadow:
+                0 20px 40px rgba(0,0,0,0.35),
+                inset 0 1px 0 rgba(255,255,255,0.02);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        thead {
+            background: var(--panel-alt);
+        }
+
+        th, td {
+            padding: 14px 16px;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        th {
+            color: var(--muted);
+            font-weight: 500;
+            text-transform: lowercase;
+        }
+
+        tbody tr {
+            border-top: 1px solid var(--border);
+            transition: background 0.2s ease;
+        }
+
+        tbody tr:nth-child(even) {
+            background: rgba(255,255,255,0.015);
+        }
+
+        tbody tr:hover {
+            background: rgba(109, 169, 255, 0.06);
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .path {
+            font-family: "JetBrains Mono", Consolas, monospace;
+            font-size: 12px;
+            color: #cbd3e1;
+        }
+
+        .password {
+            font-family: "JetBrains Mono", Consolas, monospace;
+            background: var(--accent-soft);
+            color: var(--accent);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        .password.empty {
+            background: transparent;
+            color: var(--muted);
+        }
+
+        button {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 6px 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: inset 0 0 0 1px var(--accent-soft);
+        }
+
+        .loading,
+        .error {
+            padding: 16px;
+            text-align: center;
+            color: var(--muted);
+        }
+
+        .error {
+            color: var(--danger);
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+<div class="app">
+    <header style="display:flex; align-items:center; justify-content:space-between;">
+        <div>
+            <h1>Photo Galleries</h1>
+            <span class="subtitle">Secure gallery access overview</span>
+            <br>
+            <span class="version-badge" id="appVersion"></span>
+        </div>
+    
+            <div style="display:flex; gap:8px; align-items:center;">
+            <button id="themeToggle">Black</button>
+            <button id="logoutBtn" style="border-color:var(--danger);color:var(--danger);">Log out</button>
+        </div>
+    </header>
+
+
+    <section class="table-container">
+        <table id="galleryTable">
+            <thead>
+            <tr>
+                <th>Gallery name</th>
+                <th>Link</th>
+                <th>Location</th>
+                <th>Password</th>
+                <th>Cookies</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+
+        <div id="loading" class="loading">Loading galleries&hellip;</div>
+        <div id="error" class="error hidden">Failed to load data</div>
+    </section>
+</div>
+
+<script>
+    const tableBody = document.querySelector("#galleryTable tbody");
+    const loadingEl = document.getElementById("loading");
+    const errorEl = document.getElementById("error");
+
+    async function loadGalleries() {
+        try {
+            const res = await fetch("api/list");
+            if (!res.ok) {
+                throw new Error("HTTP " + res.status);
+            }
+
+            const data = await res.json();
+            renderTable(data);
+            loadingEl.classList.add("hidden");
+        } catch (err) {
+            console.error(err);
+            loadingEl.classList.add("hidden");
+            errorEl.classList.remove("hidden");
+        }
+    }
+
+    function renderTable(items) {
+        tableBody.innerHTML = "";
+
+        if (items.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--muted); padding:32px">No galleries configured yet.</td></tr>`;
+            return;
+        }
+
+        for (const item of items) {
+            const tr = document.createElement("tr");
+            const linkUrl = `/${item.url}`;
+
+            const td1 = document.createElement("td");
+            td1.textContent = item.url;
+
+            const td2 = document.createElement("td");
+            const a = document.createElement("a");
+            a.href = linkUrl;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            a.textContent = linkUrl;
+            td2.appendChild(a);
+
+            const td3 = document.createElement("td");
+            td3.className = "path";
+            td3.textContent = item.path;
+
+            const td4 = document.createElement("td");
+            const badge = document.createElement("span");
+            if (item.pass) {
+                badge.className = "password copyable";
+                badge.dataset.pass = item.pass;
+                badge.textContent = item.pass;
+            } else {
+                badge.className = "password empty";
+                badge.textContent = "no-password";
+            }
+            td4.appendChild(badge);
+
+            const td5 = document.createElement("td");
+            td5.textContent = "0";
+
+            const td6 = document.createElement("td");
+            const btn = document.createElement("button");
+            btn.textContent = "Regenerate";
+            btn.addEventListener("click", () => regeneratePassword(item.url));
+            td6.appendChild(btn);
+
+            tr.append(td1, td2, td3, td4, td5, td6);
+            tableBody.appendChild(tr);
+        }
+    }
+
+    document.addEventListener("click", (e) => {
+        const el = e.target.closest(".password.copyable");
+        if (!el) return;
+    
+        const pass = el.dataset.pass;
+        if (!pass) return;
+    
+        navigator.clipboard.writeText(pass).then(() => {
+            const original = el.textContent;
+            el.textContent = "Copied";
+            el.classList.add("copied");
+    
+            setTimeout(() => {
+                el.textContent = original;
+                el.classList.remove("copied");
+            }, 1200);
+        });
+    });
+
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+        try {
+            const res = await fetch("/api/logout", {
+                method: "POST",
+                credentials: "include"
+            });
+            if (!res.ok) throw new Error("Logout failed");
+            // kill any cached auth cookies (best-effort)
+            document.cookie.split(";").forEach(c => {
+                document.cookie = c
+                    .replace(/^ +/, "")
+                    .replace(/=.*/, "=;expires=" + new Date(0).toUTCString() + ";path=/");
+            });
+            // back to login / root
+            window.location.href = "/admin";
+        }
+        catch (err) {
+            alert("Logout failed");
+            console.error(err);
+        }
+    });
+
+    function regeneratePassword(gallery) {
+        console.log("Regenerate password for:", gallery);
+        alert(`Regenerate password for "${gallery}"`);
+    }
+
+    
+    (function(){
+        var btn = document.getElementById('themeToggle');
+        btn.textContent = localStorage.getItem('theme') === 'black' ? 'Dark' : 'Black';
+        btn.addEventListener('click', function(){
+            var next = localStorage.getItem('theme') === 'black' ? 'dark' : 'black';
+            localStorage.setItem('theme', next);
+            document.documentElement.setAttribute('data-theme', next === 'black' ? 'black' : '');
+            btn.textContent = next === 'black' ? 'Dark' : 'Black';
+        });
+    })();
+    
+    loadGalleries();
+
+    fetch("/api/version")
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+            const v = data?.version;
+            if (v) document.getElementById("appVersion").textContent = "v" + v;
+        })
+        .catch(() => {});
+</script>
+
+</body>
+</html>

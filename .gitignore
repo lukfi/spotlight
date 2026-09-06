@@ -14,3 +14,5 @@ wip/.qmake.stash
 
 libwip.so.1*
 *.o
+
+wip/wip.vcxproj.user

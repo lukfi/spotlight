@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Finster.pro Gallery</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="dist/spotlight.bundle.js"></script>
+    <link rel="stylesheet" href="theme.css" />
+    <style>
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: system-ui, sans-serif;
+        }
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            padding: 16px;
+        }
+        .gallery a {
+            display: block;
+            aspect-ratio: 1;
+            overflow: hidden;
+            border-radius: 10px;
+        }
+        .gallery img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            cursor: pointer;
+            transition: transform .15s ease;
+        }
+        .gallery a:hover img {
+            transform: scale(1.03);
+        }
+    </style>
+</head>
+<body>
+<div class="gallery" id="gallery"></div>
+<script>
+    Spotlight.theme("dark");
+    //Get gallery name from URL (/wiki → wiki)
+    const galleryName = location.pathname.replace(/^\/+/, "").split("/")[0];
+    //Fetch images list
+    fetch(`/api/images?gallery=${encodeURIComponent(galleryName)}`)
+        .then(r => r.json())
+        .then(images => {
+            const container = document.getElementById("gallery");
+            images.forEach((img, index) => {
+                const a = document.createElement("a");
+                a.className = "spotlight";
+                a.href = "/" + img.url;
+                a.dataset.gallery = galleryName;
+                a.dataset.index = index;
+                a.dataset.control = "page,fullscreen,download,theme,prev,next,close";
+                const image = document.createElement("img");
+                image.src = "/" + (img.thumb || img.url);
+                image.alt = img.name || img.url.split("/").pop() || "";
+                image.loading = "lazy";
+                a.appendChild(image);
+                container.appendChild(a);
+            });
+            //Force Spotlight to rescan DOM (important when dynamic)
+            Spotlight.reload();
+        })
+        .catch(err => {
+            console.error("Failed to load gallery:", err);
+        });
+</script>
+</body>
+</html>
